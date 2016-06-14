@@ -22,6 +22,7 @@ describe('features/copy-paste', function() {
   var testModules = [ bpmnCopyPasteModule, copyPasteModule, tooltipsModule, modelingModule, coreModule ];
 
   var basicXML = require('../../../fixtures/bpmn/features/copy-paste/basic.bpmn'),
+      propertiesXML = require('../../../fixtures/bpmn/features/copy-paste/properties.bpmn'),
       collaborationXML = require('../../../fixtures/bpmn/features/copy-paste/collaboration.bpmn'),
       collaborationMultipleXML = require('../../../fixtures/bpmn/features/copy-paste/collaboration-multiple.bpmn'),
       collaborationAssociations = require('../../../fixtures/bpmn/features/copy-paste/data-associations.bpmn');
@@ -202,6 +203,100 @@ describe('features/copy-paste', function() {
 
   });
 
+
+  describe('properties', function() {
+
+    beforeEach(bootstrapModeler(propertiesXML, { modules: testModules }));
+
+    var subProcesses = [
+      'Sub_non_interrupt',
+      'Sub_event_subprocess',
+      'Sub_interrupt',
+      'Sub_transaction'
+    ];
+
+    function copyPasteElement(elementRegistry, canvas, copyPaste, modeling, element) {
+      // given
+      var elem = elementRegistry.get(element),
+          rootElement = canvas.getRootElement();
+
+      // when
+      copyPaste.copy(elem);
+
+      modeling.removeElements([ elem ]);
+
+      copyPaste.paste({
+        element: rootElement,
+        point: {
+          x: 175,
+          y: 450
+        }
+      });
+    }
+
+    it('should copy & paste non interrupting (boundary) events',
+      inject(function(elementRegistry, canvas, copyPaste, modeling) {
+
+        // when
+        copyPasteElement(elementRegistry, canvas, copyPaste, modeling, 'Sub_non_interrupt');
+
+        var subProcess = elementRegistry.filter(function(element) {
+          return element.type === 'bpmn:SubProcess' && (subProcesses.indexOf(element.id) === -1);
+        })[0];
+
+        var nonInterruptEvt = subProcess.attachers[0].businessObject;
+
+        // then
+        expect(nonInterruptEvt.cancelActivity).to.be.false;
+      }));
+
+
+    it('should copy & paste event sub processes',
+      inject(function(elementRegistry, canvas, copyPaste, modeling) {
+
+        // when
+        copyPasteElement(elementRegistry, canvas, copyPaste, modeling, 'Sub_event_subprocess');
+
+        var subProcess = elementRegistry.filter(function(element) {
+          return element.type === 'bpmn:SubProcess' && (subProcesses.indexOf(element.id) === -1);
+        })[0];
+
+        expect(subProcess.businessObject.triggeredByEvent).to.be.true;
+        expect(subProcess.businessObject.isExpanded).to.be.true;
+      }));
+
+
+    it('should copy & paste interrupting (boundary) events',
+      inject(function(elementRegistry, canvas, copyPaste, modeling) {
+
+        // when
+        copyPasteElement(elementRegistry, canvas, copyPaste, modeling, 'Sub_interrupt');
+
+        var subProcess = elementRegistry.filter(function(element) {
+          return element.type === 'bpmn:SubProcess' && (subProcesses.indexOf(element.id) === -1);
+        })[0];
+
+        var interruptEvt = subProcess.attachers[0].businessObject;
+
+        // then
+        expect(interruptEvt.cancelActivity).to.be.true;
+      }));
+
+
+    it('should copy & paste transactions',
+      inject(function(elementRegistry, canvas, copyPaste, modeling) {
+
+        // when
+        copyPasteElement(elementRegistry, canvas, copyPaste, modeling, 'Sub_transaction');
+
+        var transaction = elementRegistry.filter(function(element) {
+          return element.type === 'bpmn:Transaction';
+        })[0];
+
+        expect(transaction).to.exist;
+      }));
+
+  });
 
   describe('basic collaboration', function() {
 
